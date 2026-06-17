@@ -12,6 +12,7 @@ import { renderClaimCard } from './components/ClaimCard.js';
 import { ClaimFormModal } from './components/ClaimFormModal.js';
 import { ClaimDetailModal } from './components/ClaimDetailModal.js';
 import { UserManagement } from './components/UserManagement.js';
+import { ChangePasswordModal } from './components/ChangePasswordModal.js';
 import { hashPassword, isHash } from './utils/sanitize.js';
 
 // Global App State
@@ -30,6 +31,7 @@ let loginComponent = null;
 let claimFormModalComponent = null;
 let claimDetailModalComponent = null;
 let userManagementComponent = null;
+let changePasswordModalComponent = null;
 
 // DOM Elements
 const appContainer = document.getElementById('app-container');
@@ -45,6 +47,7 @@ const statusFilters = document.getElementById('status-filters');
 const issueFilters = document.getElementById('issue-filters');
 const managerActionsSection = document.getElementById('manager-actions-section');
 const userMgrBtn = document.getElementById('nav-user-mgr-btn');
+const changePwdBtn = document.getElementById('change-pwd-btn');
 const logoutBtn = document.getElementById('logout-btn');
 
 // Top Bar & Workspace DOM
@@ -390,6 +393,38 @@ function initComponents() {
       }
     }
   });
+
+  // 5. Change Password Modal
+  changePasswordModalComponent = new ChangePasswordModal({
+    onChangePassword: async (currentPassword, newPassword) => {
+      try {
+        const user = state.users.find(u => u.username === state.currentUser.username);
+        if (!user) return;
+
+        let isCorrect = false;
+        if (isHash(user.password)) {
+          const hashedInput = await hashPassword(currentPassword);
+          isCorrect = (user.password === hashedInput);
+        } else {
+          isCorrect = (user.password === currentPassword);
+        }
+
+        if (!isCorrect) {
+          alert("Current password is incorrect.");
+          return;
+        }
+
+        user.password = await hashPassword(newPassword);
+        await db.saveUser(user);
+        await loadData();
+        
+        alert("Password updated successfully.");
+        changePasswordModalComponent.close();
+      } catch (err) {
+        alert('Failed to update password: ' + err.message);
+      }
+    }
+  });
 }
 
 // Event bindings
@@ -411,6 +446,13 @@ function bindEvents() {
   sidebarCloseBtn.addEventListener('click', () => {
     sidebarContainer.classList.remove('open');
   });
+
+  // Change Password trigger
+  if (changePwdBtn) {
+    changePwdBtn.addEventListener('click', () => {
+      changePasswordModalComponent.open();
+    });
+  }
 
   // Logout button
   logoutBtn.addEventListener('click', () => {
