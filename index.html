@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SafeTClaim - Amazon SAFE-T Claim Manager</title>
+  <meta name="description" content="SafeTClaim is a mobile-optimized client-side workflow hub for tracking warehouse Amazon SAFE-T claim issues. Upload multiple photo issues, categorize, track status and manage history logs.">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="src/index.css">
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- JSZip CDN for creating ZIP downloads client-side -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+  <!-- 1. LOGIN OVERLAY/CONTAINER -->
+  <div class="login-wrapper" id="login-container">
+    <div class="login-card">
+      <div class="login-logo">
+        <i data-lucide="shield-check" class="login-logo-icon"></i>
+        <h1>SafeT<span>Claim</span></h1>
+        <p>Amazon SAFE-T Claim Hub</p>
+      </div>
+      
+      <form id="login-form" class="login-form">
+        <div class="form-group">
+          <label for="login-username">Username</label>
+          <input type="text" id="login-username" required placeholder="Enter username..." class="form-input" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" required placeholder="Enter password..." class="form-input" autocomplete="current-password">
+        </div>
+        <div class="login-error" id="login-error-msg" style="display: none;">
+          Invalid username or password.
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">
+          <span>Log In</span>
+          <i data-lucide="log-in"></i>
+        </button>
+      </form>
+      
+      <div class="login-helper">
+        <p><strong>Demo Accounts:</strong></p>
+        <p>Manager: <code>admin</code> / <code>admin123</code></p>
+        <p>Staff: <code>staff</code> / <code>staff123</code></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. MAIN APPLICATION CONTAINER -->
+  <div class="app-layout" id="app-container" style="display: none;">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar-container">
+      <div class="sidebar-header">
+        <div class="logo">
+          <i data-lucide="shield-alert" class="logo-icon"></i>
+          <span class="logo-text">SafeT<span>Claim</span></span>
+        </div>
+        <button id="sidebar-close-btn" class="icon-btn-small mobile-only" title="Close Menu">
+          <i data-lucide="chevron-left"></i>
+        </button>
+      </div>
+      
+      <!-- Current User Section -->
+      <div class="user-profile-badge">
+        <div class="user-avatar">
+          <i data-lucide="user"></i>
+        </div>
+        <div class="user-details">
+          <span id="nav-user-name" class="user-name">Loading...</span>
+          <span id="nav-user-role" class="user-role">Loading...</span>
+        </div>
+      </div>
+
+      <!-- Navigation & Filters -->
+      <div class="sidebar-section">
+        <span class="section-title">Status Filters</span>
+        <ul class="nav-filters-list" id="status-filters">
+          <li class="nav-filter-item active" data-status="all">
+            <div class="filter-item-left">
+              <i data-lucide="list"></i>
+              <span>All Claims</span>
+            </div>
+            <span class="filter-count" id="count-all">0</span>
+          </li>
+          <li class="nav-filter-item" data-status="Pending">
+            <div class="filter-item-left">
+              <i data-lucide="clock" class="status-icon-pending"></i>
+              <span>Pending</span>
+            </div>
+            <span class="filter-count" id="count-pending">0</span>
+          </li>
+          <li class="nav-filter-item" data-status="Case Created">
+            <div class="filter-item-left">
+              <i data-lucide="file-text" class="status-icon-case"></i>
+              <span>Case Created</span>
+            </div>
+            <span class="filter-count" id="count-case">0</span>
+          </li>
+          <li class="nav-filter-item" data-status="Approved">
+            <div class="filter-item-left">
+              <i data-lucide="check-circle" class="status-icon-approved"></i>
+              <span>Approved</span>
+            </div>
+            <span class="filter-count" id="count-approved">0</span>
+          </li>
+          <li class="nav-filter-item" data-status="Rejected">
+            <div class="filter-item-left">
+              <i data-lucide="x-circle" class="status-icon-rejected"></i>
+              <span>Rejected</span>
+            </div>
+            <span class="filter-count" id="count-rejected">0</span>
+          </li>
+        </ul>
+
+        <span class="section-title" style="margin-top: 16px;">Issue Types</span>
+        <ul class="nav-filters-list" id="issue-filters">
+          <li class="nav-filter-item active" data-issue="all">
+            <div class="filter-item-left">
+              <i data-lucide="layers"></i>
+              <span>Show All Categories</span>
+            </div>
+          </li>
+          <li class="nav-filter-item" data-issue="Not our item">
+            <div class="filter-item-left">
+              <i data-lucide="package-x"></i>
+              <span>Not our item</span>
+            </div>
+          </li>
+          <li class="nav-filter-item" data-issue="Missing part">
+            <div class="filter-item-left">
+              <i data-lucide="puzzle"></i>
+              <span>Missing part</span>
+            </div>
+          </li>
+          <li class="nav-filter-item" data-issue="Used item">
+            <div class="filter-item-left">
+              <i data-lucide="recycle"></i>
+              <span>Used item</span>
+            </div>
+          </li>
+          <li class="nav-filter-item" data-issue="Other">
+            <div class="filter-item-left">
+              <i data-lucide="help-circle"></i>
+              <span>Other</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Super User Only Panel -->
+      <div class="sidebar-section manager-only-section" id="manager-actions-section" style="display: none;">
+        <span class="section-title">Manager Admin</span>
+        <button id="nav-user-mgr-btn" class="footer-btn manager-btn">
+          <i data-lucide="users"></i>
+          <span>Manage Users</span>
+        </button>
+      </div>
+
+      <!-- Backup Actions -->
+      <div class="sidebar-footer">
+        <button id="logout-btn" class="footer-btn logout-btn" style="border-color: rgba(244, 63, 94, 0.2); color: #f43f5e;">
+          <i data-lucide="log-out"></i>
+          <span>Log Out</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Actions Bar -->
+      <header class="top-bar">
+        <div class="menu-trigger-container">
+          <button id="sidebar-toggle-btn" class="icon-btn mobile-only" title="Open Menu">
+            <i data-lucide="menu"></i>
+          </button>
+        </div>
+        
+        <div class="search-box">
+          <i data-lucide="search" class="search-icon"></i>
+          <input type="text" id="search-input" placeholder="Search Shipment ID, Tracking #, comments..." autocomplete="off">
+          <button id="clear-search-btn" class="clear-btn" style="display: none;">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+
+        <div class="top-actions">
+          <button id="add-claim-btn" class="btn btn-primary">
+            <i data-lucide="plus"></i>
+            <span>Add Record</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Active filter pills header (Search/Category status) -->
+      <div class="filter-header" id="filter-header" style="display: none;">
+        <span class="filter-label">Active filters:</span>
+        <div class="active-filters-container" id="active-filters-container">
+          <!-- Dynamic filter pills -->
+        </div>
+        <button id="clear-all-filters-btn" class="text-btn">Clear All</button>
+      </div>
+
+      <!-- Claims Viewport -->
+      <section class="gallery-viewport">
+        <div class="claims-list-grid" id="claims-grid">
+          <!-- Dynamic claim list cards will load here -->
+        </div>
+        
+        <!-- Empty State -->
+        <div class="empty-state" id="empty-state" style="display: none;">
+          <div class="empty-icon-container">
+            <i data-lucide="folder-open"></i>
+          </div>
+          <h2 id="empty-state-title">No claims found</h2>
+          <p id="empty-state-text">Everything looks cleared up! Tap Add Record to register a new claim issue.</p>
+          <button id="empty-state-btn" class="btn btn-primary">
+            <i data-lucide="plus"></i>
+            <span>Add Record Now</span>
+          </button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 3. ADD/EDIT CLAIM FORM MODAL -->
+  <div class="modal-backdrop" id="claim-form-modal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="claim-form-title">Add Shipment Claim Record</h3>
+        <button class="close-modal-btn modal-close-trigger">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form id="claim-upload-form" class="modal-form">
+        <input type="hidden" id="form-claim-id">
+        
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="form-shipment-id">Shipment ID *</label>
+            <input type="text" id="form-shipment-id" required placeholder="e.g. FBA15G8XYZ" class="form-input" maxlength="25">
+          </div>
+
+          <div class="form-group">
+            <label for="form-tracking">Tracking Number *</label>
+            <input type="text" id="form-tracking" required placeholder="e.g. 1Z999AA10123456784" class="form-input" maxlength="35">
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="form-return-type">Return Channel *</label>
+            <select id="form-return-type" required class="form-input">
+              <option value="" disabled selected>-- Select return channel --</option>
+              <option value="Amazon">Amazon</option>
+              <option value="FBA Return">FBA Return</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="form-issue-type">Issue Reason *</label>
+            <select id="form-issue-type" required class="form-input">
+              <option value="" disabled selected>-- Select warehouse issue reason --</option>
+              <option value="Not our item">Not our item (Received wrong merchandise)</option>
+              <option value="Missing part">Missing part (Accessories / units empty)</option>
+              <option value="Used item">Used item (Customer returned a damaged/worn item)</option>
+              <option value="Other">Other (Specify in messages below)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Multiple Images Upload Box -->
+        <div class="form-group">
+          <label>Photo Evidence Upload * <span class="label-hint">(Select multiple pictures)</span></label>
+          <div class="upload-dropzone" id="upload-dropzone">
+            <i data-lucide="camera" class="upload-icon"></i>
+            <p class="upload-prompt">Click to snap photo / browse gallery files</p>
+            <p class="upload-limit">Supports multiple images (JPG, PNG, WEBP)</p>
+            <input type="file" id="form-claim-files" accept="image/*" multiple style="display: none;">
+          </div>
+          
+          <!-- Selected Multi images thumbnails grid -->
+          <div class="multi-preview-grid" id="multi-preview-grid">
+            <!-- Dynamic image list previewed here -->
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="form-message">Warehouse Comments / Message Box</label>
+          <textarea id="form-message" placeholder="Provide clear details on why the Amazon customer return is invalid..." rows="3" class="form-input"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary modal-close-trigger">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="form-submit-btn">Save Claim Record</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. VIEW CLAIM DETAIL & TIMELINE MODAL -->
+  <div class="modal-backdrop" id="claim-detail-modal" style="display: none;">
+    <div class="modal-card modal-card-large">
+      <div class="modal-header">
+        <div class="detail-header-left">
+          <span id="detail-status-badge" class="status-badge status-pending">Pending</span>
+          <h3 id="detail-shipment-title">Shipment Details</h3>
+        </div>
+        <div class="modal-header-actions">
+          <button id="detail-download-single-btn" class="icon-btn" title="Download Current Photo">
+            <i data-lucide="download"></i>
+          </button>
+          <button id="detail-download-zip-btn" class="icon-btn" title="Download Evidence Photos as ZIP">
+            <i data-lucide="folder-archive"></i>
+          </button>
+          <button id="detail-delete-btn" class="icon-btn-danger-circle" title="Delete Claim Record" style="display: none;">
+            <i data-lucide="trash-2"></i>
+          </button>
+          <button class="close-modal-btn modal-close-trigger">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+      </div>
+      
+      <div class="modal-body-split">
+        <!-- Visual slider frame -->
+        <div class="detail-viewer-container">
+          <button id="prev-image-btn" class="carousel-nav-btn prev" title="Previous Image">
+            <i data-lucide="chevron-left"></i>
+          </button>
+          
+          <div class="detail-image-wrapper">
+            <img id="detail-img" src="" alt="Claim Evidence">
+          </div>
+          
+          <button id="next-image-btn" class="carousel-nav-btn next" title="Next Image">
+            <i data-lucide="chevron-right"></i>
+          </button>
+          
+          <!-- Image Indicator badge: 1 / 3 -->
+          <span class="carousel-indicator" id="carousel-indicator">0 / 0</span>
+        </div>
+
+        <!-- Info details side bar -->
+        <div class="detail-info-panel">
+          <div class="detail-info-grid">
+            <div class="detail-info-section">
+              <span class="info-label">Shipment ID</span>
+              <span id="detail-shipment-id" class="info-val-strong">FBA15G8XYZ</span>
+            </div>
+            <div class="detail-info-section">
+              <span class="info-label">Tracking Number</span>
+              <span id="detail-tracking" class="info-val-strong">1Z999AA10123...</span>
+            </div>
+          </div>
+
+          <div class="detail-info-grid">
+            <div class="detail-info-section">
+              <span class="info-label">Return Channel</span>
+              <span id="detail-return-type" class="info-return-badge">Amazon</span>
+            </div>
+            <div class="detail-info-section">
+              <span class="info-label">Warehouse Issue</span>
+              <span id="detail-issue-type" class="info-issue-badge">Not our item</span>
+            </div>
+          </div>
+
+          <div class="detail-info-grid">
+            <div class="detail-info-section">
+              <span class="info-label font-body">Reported By</span>
+              <span id="detail-reporter" class="info-val-small">staff (Warehouse)</span>
+            </div>
+            <div class="detail-info-section">
+              <span class="info-label">Date Logged</span>
+              <span id="detail-date" class="info-val-small">June 17, 2026 12:00 PM</span>
+            </div>
+          </div>
+
+          <div class="detail-info-section">
+            <span class="info-label">Warehouse Message</span>
+            <p id="detail-message" class="info-val-text">No comments provided.</p>
+          </div>
+
+          <!-- MANAGER STATUS CONTROLS (Only visible to managers) -->
+          <div class="manager-status-panel" id="manager-status-panel" style="display: none;">
+            <span class="info-label" style="color: var(--color-primary);">Super User Actions</span>
+            <div class="manager-form-group">
+              <label for="manager-status-select">Change Status To:</label>
+              <select id="manager-status-select" class="form-input">
+                <option value="Pending">Pending Audit</option>
+                <option value="Case Created">Case Created</option>
+                <option value="Approved">Claim Approved</option>
+                <option value="Rejected">Claim Rejected</option>
+              </select>
+            </div>
+            <div class="manager-form-group" style="margin-top: 8px;">
+              <label for="manager-comment-input">Status Note / Comment:</label>
+              <input type="text" id="manager-comment-input" placeholder="e.g. Case ID: 15392019" class="form-input">
+            </div>
+            <button id="manager-save-status-btn" class="btn btn-primary btn-block" style="margin-top: 10px;">
+              <i data-lucide="check"></i>
+              <span>Apply Status Change</span>
+            </button>
+          </div>
+
+          <!-- History Timeline list -->
+          <div class="detail-info-section timeline-section">
+            <span class="info-label">History Timeline</span>
+            <div class="timeline-container" id="detail-history-timeline">
+              <!-- Dynamic status history items -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. USER MANAGEMENT MODAL (Manager Only) -->
+  <div class="modal-backdrop" id="user-management-modal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>User Account Management</h3>
+        <button class="close-modal-btn modal-close-trigger">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      
+      <div class="modal-form">
+        <!-- Add user section -->
+        <fieldset class="user-mgr-fieldset">
+          <legend>Create User Account</legend>
+          <form id="add-user-form" class="user-mgr-add-form">
+            <div class="form-group">
+              <label for="new-username">Username *</label>
+              <input type="text" id="new-username" required placeholder="e.g. staff2" class="form-input" maxlength="20">
+            </div>
+            <div class="form-group">
+              <label for="new-password">Password *</label>
+              <input type="password" id="new-password" required placeholder="e.g. staffpass1" class="form-input" minlength="4">
+            </div>
+            <div class="form-group">
+              <label for="new-role">System Role *</label>
+              <select id="new-role" required class="form-input">
+                <option value="staff">Warehouse Staff</option>
+                <option value="super">Super User (Manager)</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-top: 8px;">
+              <i data-lucide="user-plus"></i>
+              <span>Add User</span>
+            </button>
+          </form>
+        </fieldset>
+
+        <!-- Current users list -->
+        <span class="info-label" style="margin-top: 16px;">Active Systems Users</span>
+        <div class="table-container">
+          <table class="user-mgr-table">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Role</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="user-mgr-tbody">
+              <!-- Dynamic user lists -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS Entrypoint -->
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
