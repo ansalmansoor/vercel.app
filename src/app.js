@@ -414,11 +414,13 @@ function initComponents() {
           return;
         }
 
-        user.password = await hashPassword(newPassword);
-        await db.saveUser(user);
+        // Clone user to avoid mutating in-memory state before DB write
+        const updatedUser = { ...user, password: await hashPassword(newPassword) };
+        await db.saveUser(updatedUser);
+        // Reload all users from DB to sync in-memory state
         await loadData();
         
-        alert("Password updated successfully.");
+        alert("Password updated successfully!");
         changePasswordModalComponent.close();
       } catch (err) {
         alert('Failed to update password: ' + err.message);
