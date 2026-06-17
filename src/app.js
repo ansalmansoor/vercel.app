@@ -7,6 +7,7 @@ if (window.location.search.includes('test=true')) {
 }
 
 import * as db from './utils/db.js';
+import { getSupabaseUsers, saveSupabaseUser, deleteSupabaseUser } from './utils/supabase.js';
 import { Login } from './components/Login.js';
 import { renderClaimCard } from './components/ClaimCard.js';
 import { ClaimFormModal } from './components/ClaimFormModal.js';
@@ -68,15 +69,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function initApp() {
   try {
-    // 1. Initialize DB
+    // 1. Initialize local IndexedDB (for claims)
     await db.initDB();
 
-    // 2. Load Users & Claims from DB
+    // 2. Load Users from Supabase + Claims from IndexedDB
     await loadData();
 
-    // 3. Seed default users and sample claims if database is clean
-    if (state.users.length === 0) {
-      await seedMockUsers();
+    // 3. Seed sample claims if local DB is empty (users are seeded in Supabase)
+    if (state.claims.length === 0) {
       await seedMockClaims();
       await loadData();
     }
@@ -94,13 +94,15 @@ async function initApp() {
     restoreSession();
   } catch (error) {
     console.error('Failed to initialize SafeTClaim app:', error);
-    alert('Failed to initialize local IndexedDB. Please enable cookies/storage.');
+    alert('Failed to load app. Please check your internet connection (Supabase required).');
   }
 }
 
 // Data loaders
 async function loadData() {
-  state.users = await db.getUsers();
+  // Users → Supabase (persistent across all devices/browsers)
+  state.users = await getSupabaseUsers();
+  // Claims → IndexedDB (local browser storage)
   state.claims = await db.getClaims();
 }
 
@@ -372,7 +374,7 @@ function initComponents() {
       try {
         // Hash password before saving
         userData.password = await hashPassword(userData.password);
-        await db.saveUser(userData);
+        await saveSupabaseUser(userData); // Saved to Supabase (persists everywhere)
         await loadData();
         userManagementComponent.renderUsers(state.users, state.currentUser.username);
       } catch (err) {
@@ -385,7 +387,7 @@ function initComponents() {
         return;
       }
       try {
-        await db.deleteUser(username);
+        await deleteSupabaseUser(username); // Deleted from Supabase
         await loadData();
         userManagementComponent.renderUsers(state.users, state.currentUser.username);
       } catch (err) {
@@ -414,10 +416,10 @@ function initComponents() {
           return;
         }
 
-        // Clone user to avoid mutating in-memory state before DB write
+        // Clone user and save new hashed password to Supabase
         const updatedUser = { ...user, password: await hashPassword(newPassword) };
-        await db.saveUser(updatedUser);
-        // Reload all users from DB to sync in-memory state
+        await saveSupabaseUser(updatedUser); // Saved to Supabase (persists everywhere)
+        // Reload users from Supabase to sync in-memory state
         await loadData();
         
         alert("Password updated successfully!");
